@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "commands.h": "c",
+        "vga.h": "c"
+    }
+}

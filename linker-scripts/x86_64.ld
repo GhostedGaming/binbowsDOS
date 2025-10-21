@@ -1,51 +1,32 @@
-OUTPUT(elf32-i386)
+OUTPUT_FORMAT(elf32-i386)
 ENTRY(kmain)
-
-PHDRS
-{
-    text PT_LOAD;
-    rodata PT_LOAD;
-    data PT_LOAD;
-}
 
 SECTIONS
 {
-    . = 0xffffffff80000000;
+    . = 0x00100000;  /* 1MB - standard kernel load address */
 
-    /* Move to the next memory page for .text */
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    .text ALIGN(4K) : {
+        *(.text)
+        *(.text.*)
+        *(.rodata)      /* Put rodata in text section */
+        *(.rodata.*)
+    }
 
-    .text : {
-        *(.text .text.*)
-    } :text
+    .data ALIGN(4K) : {
+        *(.data)
+        *(.data.*)
+    }
 
-    /* Move to the next memory page for .rodata */
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
-
-    .rodata : {
-        *(.rodata .rodata.*)
-    } :rodata
-
-    /* Add a .note.gnu.build-id output section in case a build ID flag is added to the */
-    /* linker command. */
-    .note.gnu.build-id : {
-        *(.note.gnu.build-id)
-    } :rodata
-
-    /* Move to the next memory page for .data */
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
-
-    .data : {
-        *(.data .data.*)
-    } :data
-
-    .bss : {
-        *(.bss .bss.*)
+    .bss ALIGN(4K) : {
         *(COMMON)
-    } :data
+        *(.bss)
+        *(.bss.*)
+    }
 
     /DISCARD/ : {
-        *(.eh_frame*)
-        *(.note .note.*)
+        *(.eh_frame)
+        *(.eh_frame_hdr)
+        *(.note.*)
+        *(.comment)
     }
 }
