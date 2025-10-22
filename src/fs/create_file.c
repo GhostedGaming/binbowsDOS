@@ -19,5 +19,5 @@ struct inode* create_file(uint8_t drive){
 
     memset(inode, 0, sizeof(struct inode));
 
-    
+
 }

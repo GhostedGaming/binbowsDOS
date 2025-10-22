@@ -35,7 +35,6 @@ struct inode {
 };
 
 struct super_block* create_super(uint8_t drive);
-void destroy_superblock(struct super_block* sb);
 int elixir_format(uint8_t drive);
 
 #endif

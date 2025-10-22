@@ -54,9 +54,3 @@ struct super_block* create_super(uint8_t drive) {
 
     return sb;
 }
-
-void destroy_superblock(struct super_block* sb) {
-    if (sb) {
-        kfree(sb);
-    }
-}

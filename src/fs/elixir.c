@@ -57,7 +57,7 @@ int elixir_format(uint8_t drive) {
 
     printf("Superblock verification successful!\n");
     kfree(sb_verify);
-    destroy_superblock(sb);
+    destroy(sb);
 
     return 0;
 }
