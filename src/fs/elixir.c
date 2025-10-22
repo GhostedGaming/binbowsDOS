@@ -22,7 +22,7 @@ int elixir_format(uint8_t drive) {
 
     if (result != 0) {
         printf("Error: Failed to write superblock to disk.\n");
-        destroy_superblock(sb);
+        destroy(sb);
         return -1;
     }
 
@@ -30,7 +30,7 @@ int elixir_format(uint8_t drive) {
     struct super_block* sb_verify = kmalloc(sizeof(struct super_block));
     if (!sb_verify) {
         printf("Error: Failed to allocate verification buffer.\n");
-        destroy_superblock(sb);
+        destroy(sb);
         return -1;
     }
 
@@ -38,7 +38,7 @@ int elixir_format(uint8_t drive) {
     if (result != 0) {
         printf("Error: Failed to read back superblock from disk.\n");
         kfree(sb_verify);
-        destroy_superblock(sb);
+        destroy(sb);
         return -1;
     }
 
@@ -51,7 +51,7 @@ int elixir_format(uint8_t drive) {
         printf("  Expected block_size=%u, got=%u\n", sb->s_block_size, sb_verify->s_block_size);
         printf("  Expected total_blocks=%u, got=%u\n", sb->s_total_blocks, sb_verify->s_total_blocks);
         kfree(sb_verify);
-        destroy_superblock(sb);
+        destroy(sb);
         return -1;
     }
 
