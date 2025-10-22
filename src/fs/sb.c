@@ -28,7 +28,7 @@ struct super_block* create_super(uint8_t drive) {
 
     memset(sb, 0, sizeof(struct super_block));
 
-    if (total_sectors < 32768)               sectors_per_block = 1;     // 512B
+    if (total_sectors < 32768)               return NULL;
     else if (total_sectors < 131072)         sectors_per_block = 2;     // 1KB
     else if (total_sectors < 524288)         sectors_per_block = 4;     // 2KB
     else if (total_sectors < 2097152)        sectors_per_block = 8;     // 4KB
