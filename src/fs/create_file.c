@@ -2,8 +2,8 @@
 #include <vga.h>
 #include <ide.h>
 
-struct inode* create_file(uint8_t drive){
-    struct inode* in;
+struct index* create_file(uint8_t drive){
+    struct index* in;
 
     if (drive >= 4) {
         printf("Error: Invalid drive index %d.\n", drive);
@@ -11,13 +11,14 @@ struct inode* create_file(uint8_t drive){
     }
 
     printf("Allocating super_block struct...\n");
-    in = kmalloc(sizeof(struct inode));
-    if (!in) {
-        printf("Failed to allocate inode!\n");
+    in = kmalloc(sizeof(struct index));
+    if (!in)  {
+        printf("Failed to allocate index!\n");
         return NULL;
     }
 
-    memset(inode, 0, sizeof(struct inode));
+    memset(in, 0, sizeof(struct index));
 
-
+    in->type = 1; // Standard txt file
+    in->size = 0;
 }

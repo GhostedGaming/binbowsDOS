@@ -20,19 +20,18 @@ struct super_block {
     uint8_t  padding[480];
 };
 
-struct inode {
-    uint32_t i_mode;        // File mode
-    uint32_t i_uid;         // Owner UID
-    uint32_t i_size;        // Size in bytes
-    uint32_t i_atime;       // Access time
-    uint32_t i_ctime;       // Creation time
-    uint32_t i_mtime;       // Modification time
-    uint32_t i_dtime;       // Deletion time
-    uint16_t i_gid;         // Group ID
-    uint16_t i_links_count; // Links count
-    uint32_t i_blocks;      // Number of blocks allocated
-    uint32_t i_block[15];   // Pointers to blocks
-};
+struct block_bitmap {
+    uint32_t free_count;
+    uint32_t used_count;
+    uint32_t total;
+}
+
+struct index {
+    uint8_t time_stamp;
+    uint8_t type;
+    // uint8_t permissions
+    uint32_t size;
+}
 
 struct super_block* create_super(uint8_t drive);
 int elixir_format(uint8_t drive);

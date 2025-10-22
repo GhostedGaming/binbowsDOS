@@ -18,7 +18,7 @@ int elixir_format(uint8_t drive) {
     printf("Writing superblock (%u bytes, %u sectors) to disk...\n",
         sizeof(struct super_block), sectors_to_write);
 
-    int result = ide_write_sectors(drive, 2, sectors_to_write, (void*)sb);
+    int result = ide_write_sectors(drive, 2, sizeof(struct super_block),(void*)sb);
 
     if (result != 0) {
         printf("Error: Failed to write superblock to disk.\n");
