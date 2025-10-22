@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "commands.h": "c",
-        "vga.h": "c"
+        "vga.h": "c",
+        "idt.h": "c",
+        "isr.h": "c"
     }
 }
