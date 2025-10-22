@@ -3,6 +3,11 @@
         "commands.h": "c",
         "vga.h": "c",
         "idt.h": "c",
-        "isr.h": "c"
+        "isr.h": "c",
+        "mem.h": "c",
+        "timer.h": "c",
+        "ide.h": "c",
+        "exceptions.h": "c",
+        "elixir.h": "c"
     }
 }

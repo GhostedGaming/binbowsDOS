@@ -4,11 +4,12 @@
 #include <exceptions.h>
 #include <irq.h>
 #include <timer.h>
+#include <mem.h>
+#include <ide.h>
+#include <fs/elixir.h>
 
-void kernel_main(void) {
-    clear_screen();
-    printf("Welcome to binbowsDOS!\n");
-    printf("=====================\n\n");
+void kmain(void) {
+    init_allocator_region(0x00100000, 16 * 1024 * 1024);
     
     printf("Initializing GDT...\n");
     gdt_install(); 
@@ -26,13 +27,16 @@ void kernel_main(void) {
     
     init_timer();
     
-    printf("\nSystem initialized successfully!\n");
-    
-    asm volatile ("sti");
+    clear_screen();
 
-    printf("Entering idle loop...\n");
-    
-    for(;;) {
+    asm volatile ("sti");
+    printf("Welcome To BinbowsDOS!\n");
+
+    printf("Detecting IDE devices...\n");
+    ide_initialize();
+    printf("IDE devices detected and initialized.\n");
+
+    while (1) {
         asm volatile ("hlt"); 
     }
 }
