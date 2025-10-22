@@ -134,3 +134,40 @@ int ide_write_sectors_counted(uint8_t drive, uint32_t start_lba, size_t byte_cou
 
     return 0;
 }
+
+uint32_t find_next_free_lba(uint8_t drive) {
+    extern struct ide_device ide_devices[4];
+
+    if (drive >= 4) return UINT32_MAX;
+    if (!ide_devices[drive].Reserved) return UINT32_MAX;
+
+    uint32_t size = ide_devices[drive].size;
+    if (size == 0) return UINT32_MAX;
+
+    uint8_t buf[512];
+    int seen_used = 0;
+    uint32_t last_used_lba = 0xFFFFFFFF;
+
+    for (uint32_t lba = 0; lba < size; ++lba) {
+        if (ide_read_sectors(drive, 1, lba, buf) != 0) {
+            return UINT32_MAX;
+        }
+
+        int all_zero = 1;
+        for (size_t i = 0; i < sizeof(buf); ++i) {
+            if (buf[i] != 0) {
+                all_zero = 0;
+                break;
+            }
+        }
+
+        if (!all_zero) {
+            seen_used = 1;
+            last_used_lba = lba;
+        }
+    }
+
+    if (!seen_used) return 0;            /* no used sectors, next free is LBA 0 */
+    if (last_used_lba == size - 1) return UINT32_MAX; /* no free space after last used */
+    return last_used_lba + 1;            /* start sector of the next free */
+}

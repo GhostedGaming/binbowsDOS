@@ -28,14 +28,11 @@ struct super_block* create_super(uint8_t drive) {
 
     memset(sb, 0, sizeof(struct super_block));
 
-    if (total_sectors < 32768)               return NULL;
-    else if (total_sectors < 131072)         sectors_per_block = 2;     // 1KB
-    else if (total_sectors < 524288)         sectors_per_block = 4;     // 2KB
-    else if (total_sectors < 2097152)        sectors_per_block = 8;     // 4KB
-    else if (total_sectors < 8388608)        sectors_per_block = 16;    // 8KB
-    else if (total_sectors < 33554432)       sectors_per_block = 32;    // 16KB
-    else if (total_sectors < 134217728)      sectors_per_block = 64;    // 32KB
-    else                                     sectors_per_block = 128;   // 64KB for >64GB disks
+    if (total_sectors < 9765625) {
+        printf("Drive too small drive must be atleast 5GB");
+        destroy(sb);
+        return NULL;
+    }
 
     sb->s_magic = 0xE1F5;
     sb->s_block_size = sector_size * sectors_per_block;

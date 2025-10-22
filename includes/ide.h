@@ -120,5 +120,6 @@ void ide_delay(uint8_t channel);
 int ide_read_sectors(uint8_t drive, uint8_t numsects, uint32_t lba, void *buf);
 int ide_write_sectors_counted(uint8_t drive, uint32_t start_lba, size_t byte_count, const void *buf);
 uint64_t read_total_sectors(uint8_t drive_num);
+uint32_t find_next_free_lba(uint8_t drive);
 
 #endif // IDE_H
