@@ -8,6 +8,8 @@
         "timer.h": "c",
         "ide.h": "c",
         "exceptions.h": "c",
-        "elixir.h": "c"
+        "elixir.h": "c",
+        "limits.h": "c",
+        "stdbool.h": "c"
     }
 }

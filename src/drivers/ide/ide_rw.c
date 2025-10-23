@@ -73,23 +73,21 @@ int ide_write_sectors_counted(uint8_t drive, uint32_t start_lba, size_t byte_cou
     if (byte_count == 0)
         return 0;
 
-    /* must be whole-sector multiples (or you could pad) */
     if (byte_count % 512)
-        return 2; /* or handle padding */
+        return 2;
 
     size_t total_sectors = byte_count / 512;
     const uint8_t *data = (const uint8_t *)buf;
+    size_t sectors_written = 0;
     size_t sectors_remaining = total_sectors;
     uint32_t lba = start_lba;
     int ret;
 
-    /* 28-bit LBA limit for this driver: 0x0FFFFFFF (sectors) */
     const uint32_t LBA28_MAX = 0x0FFFFFFF;
 
     while (sectors_remaining) {
-        if (lba > LBA28_MAX) return 3; /* LBA out of range */
+        if (lba > LBA28_MAX) return 3;
 
-        /* ATA allows up to 256 sectors per single command; SECCOUNT0 = 0 means 256 */
         uint8_t n = (sectors_remaining >= 256) ? 0 : (uint8_t)sectors_remaining;
 
         uint8_t channel = ide_devices[drive].Channel;
@@ -98,7 +96,6 @@ int ide_write_sectors_counted(uint8_t drive, uint32_t start_lba, size_t byte_cou
         uint8_t lba_io[6];
         uint8_t head;
 
-        /* prepare 28-bit LBA fields */
         lba_io[0] = (lba >> 0) & 0xFF;
         lba_io[1] = (lba >> 8) & 0xFF;
         lba_io[2] = (lba >> 16) & 0xFF;
@@ -116,18 +113,17 @@ int ide_write_sectors_counted(uint8_t drive, uint32_t start_lba, size_t byte_cou
         ide_write(channel, ATA_REG_LBA2, lba_io[2]);
         ide_write(channel, ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
 
-        /* sectors_to_transfer: 256 if n==0 else n */
         uint16_t sectors_to_transfer = (n == 0) ? 256 : n;
         for (uint16_t i = 0; i < sectors_to_transfer; i++) {
             uint8_t err;
             if ((err = ide_polling(channel, 0))) return err;
-            outsw(bus, (const uint16_t *)(data + (total_sectors - sectors_remaining + i) * 512), 256);
+            outsw(bus, (const uint16_t *)(data + (sectors_written + i) * 512), 256);
         }
 
         ide_write(channel, ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
         if ((ret = ide_polling(channel, 0))) return ret;
 
-        /* advance */
+        sectors_written += sectors_to_transfer;
         sectors_remaining -= sectors_to_transfer;
         lba += sectors_to_transfer;
     }
@@ -141,7 +137,7 @@ uint32_t find_next_free_lba(uint8_t drive) {
     if (drive >= 4) return UINT32_MAX;
     if (!ide_devices[drive].Reserved) return UINT32_MAX;
 
-    uint32_t size = ide_devices[drive].size;
+    uint32_t size = ide_devices[drive].Size;
     if (size == 0) return UINT32_MAX;
 
     uint8_t buf[512];

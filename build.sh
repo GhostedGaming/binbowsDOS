@@ -20,6 +20,7 @@ BOOTLOADER="${BUILD_DIR}/boot.bin"
 KERNEL_ELF="${BUILD_DIR}/kernel.elf"
 KERNEL_BIN="${BUILD_DIR}/kernel.bin"
 OS_IMAGE="${BUILD_DIR}/os.bin"
+IDE_DRIVE="${BUILD_DIR}/ide_drive.img"
 
 CFLAGS="
 -ffreestanding -nostdlib -Wall -Wextra -pedantic -O2 -m32
@@ -160,6 +161,18 @@ else
 fi
 
 # ========================
+# Create IDE Drive
+# ========================
+echo -e "${GREEN}Creating IDE drive...${NC}"
+if [ ! -f "${IDE_DRIVE}" ]; then
+    # Create a 100MB IDE drive image
+    dd if=/dev/zero of="${IDE_DRIVE}" bs=1M count=100 status=none
+    echo "  Created new IDE drive: ${IDE_DRIVE} (100MB)"
+else
+    echo "  Using existing IDE drive: ${IDE_DRIVE}"
+fi
+
+# ========================
 # Build Summary
 # ========================
 echo -e "${BLUE}════════════════════════════════════${NC}"
@@ -175,10 +188,11 @@ fi
 echo "  Kernel ELF: ${KERNEL_ELF} ($(stat -c%s ${KERNEL_ELF}) bytes)"
 echo "  Kernel BIN: ${KERNEL_BIN} ($(stat -c%s ${KERNEL_BIN}) bytes)"
 echo "  OS Image:   ${OS_IMAGE} ($(stat -c%s ${OS_IMAGE}) bytes)"
+echo "  IDE Drive:  ${IDE_DRIVE} ($(stat -c%s ${IDE_DRIVE}) bytes)"
 echo ""
 
 # ========================
 # Run in QEMU
 # ========================
 echo -e "${BLUE}Launching QEMU...${NC}"
-qemu-system-i386 -drive format=raw,file=${OS_IMAGE} -m 128M
+qemu-system-i386 -drive format=raw,file=${OS_IMAGE} -drive format=raw,file=${IDE_DRIVE},if=ide -m 128M

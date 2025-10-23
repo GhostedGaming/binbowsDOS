@@ -36,6 +36,13 @@ void kmain(void) {
     ide_initialize();
     printf("IDE devices detected and initialized.\n");
 
+    uint8_t drive = 1;
+
+    printf("Formatting drive %d\n", drive);
+    elixir_format(drive);
+    elixir_mount(drive, NULL);
+    printf("Drive %d formatted with Elixir filesystem.\n", drive);
+
     while (1) {
         asm volatile ("hlt"); 
     }
