@@ -9,7 +9,7 @@
 #include <fs/elixir.h>
 
 void kmain(void) {
-    init_allocator_region(0x00100000, 16 * 1024 * 1024);
+    init_allocator_region(0x00100000, 2 * 1024 * 1024 * 1024);
     
     printf("Initializing GDT...\n");
     gdt_install(); 

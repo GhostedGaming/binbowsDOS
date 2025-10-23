@@ -28,6 +28,7 @@ struct super_block* create_super(uint8_t drive) {
         printf("Failed to allocate super_block!\n");
         return NULL;
     }
+    printf("Struct allocated\n");
 
     memset(sb, 0, sizeof(struct super_block));
 

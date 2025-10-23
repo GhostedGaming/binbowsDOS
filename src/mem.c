@@ -97,6 +97,7 @@ void *kmalloc(size_t size) {
     free_list_block **current = &free_list_head;
 
     while (*current) {
+        printf("Current\n");
         free_list_block *block = *current;
         if (block->size >= size) {
             // Split block if remaining space is large enough for another header + min block
