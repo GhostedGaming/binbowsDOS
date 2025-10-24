@@ -198,4 +198,4 @@ echo -e "${BLUE}Launching QEMU...${NC}"
 qemu-system-i386 \
   -drive format=raw,file=${OS_IMAGE} \
   -drive format=raw,file=${IDE_DRIVE},if=ide \
-  -m 1G \
+  -m 1G -display curses -monitor none

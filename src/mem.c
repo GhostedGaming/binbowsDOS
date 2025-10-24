@@ -1,13 +1,20 @@
 #include <stdint.h>
 #include <stddef.h>
-#include <vga.h>
-#include <mem.h>
 
 #define MIN_ALLOC_SIZE 16
 #define ALIGN_SIZE 8
-#define PAGE_SIZE 4096
+
+typedef struct free_list_block {
+    uint32_t magic;
+    size_t size;
+    struct free_list_block *next;
+} free_list_block;
+
+#define FREE_BLOCK_MAGIC 0xF00DBABE
 
 static free_list_block *free_list_head = NULL;
+static uintptr_t allocator_start = 0;
+static uintptr_t allocator_end = 0;
 
 static inline unsigned long save_and_cli(void) {
     unsigned long flags;
@@ -16,7 +23,6 @@ static inline unsigned long save_and_cli(void) {
     return flags;
 }
 
-// Restore flags if interrupts were enabled
 static inline void restore_flags(unsigned long flags) {
     if (flags & (1 << 9))
         __asm__ volatile("sti");
@@ -26,109 +32,107 @@ static size_t align_up(size_t size, size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-static void memset_page(void *ptr, int value, size_t size) {
-    uint8_t *p = (uint8_t *)ptr;
-    for (size_t i = 0; i < size; i++)
-        p[i] = (uint8_t)value;
+static int valid_block_ptr(free_list_block *b) {
+    if (!b) return 0;
+    uintptr_t addr = (uintptr_t)b;
+    if (addr < allocator_start || addr + sizeof(free_list_block) > allocator_end) return 0;
+    if (b->magic != FREE_BLOCK_MAGIC) return 0;
+    if (b->size > (allocator_end - addr)) return 0;
+    return 1;
 }
 
 static void insert_free_block_sorted(free_list_block *block) {
     if (!block) return;
-
-    free_list_block **cur = &free_list_head;
-    while (*cur && *cur < block)
-        cur = &(*cur)->next;
-
-    block->next = *cur;
-    *cur = block;
-
-    // Merge with next block (coalescing forward)
-    if (block->next && (uint8_t*)block + sizeof(free_list_block) + block->size == (uint8_t*)block->next) {
-        block->size += sizeof(free_list_block) + block->next->size;
-        block->next = block->next->next;
+    block->magic = FREE_BLOCK_MAGIC;
+    if (!free_list_head) {
+        free_list_head = block;
+        block->next = NULL;
+        return;
     }
-
-    // Merge with previous block (coalescing backward)
-    if (cur != &free_list_head) {
-        free_list_block *prev = free_list_head;
-        // Search for the block *before* 'block'
-        while (prev && prev->next != block) prev = prev->next;
-        if (prev && (uint8_t*)prev + sizeof(free_list_block) + prev->size == (uint8_t*)block) {
-            prev->size += sizeof(free_list_block) + block->size;
-            prev->next = block->next;
+    free_list_block *prev = NULL;
+    free_list_block *cur = free_list_head;
+    while (cur && (uintptr_t)cur < (uintptr_t)block) {
+        prev = cur;
+        cur = cur->next;
+    }
+    if (!prev) {
+        block->next = free_list_head;
+        free_list_head = block;
+    } else {
+        block->next = prev->next;
+        prev->next = block;
+    }
+    if (block->next) {
+        uintptr_t end_block = (uintptr_t)block + sizeof(free_list_block) + block->size;
+        if (end_block == (uintptr_t)block->next) {
+            block->size += sizeof(free_list_block) + block->next->size;
+            block->next = block->next->next;
         }
+    }
+    prev = NULL;
+    cur = free_list_head;
+    while (cur && cur->next) {
+        uintptr_t end_cur = (uintptr_t)cur + sizeof(free_list_block) + cur->size;
+        if (end_cur == (uintptr_t)cur->next) {
+            cur->size += sizeof(free_list_block) + cur->next->size;
+            cur->next = cur->next->next;
+            continue;
+        }
+        cur = cur->next;
     }
 }
 
 void init_allocator_region(uint32_t region_base, uint32_t region_size) {
-    printf("Initializing allocator region: 0x%x - 0x%x (%u KB)\n",
-           region_base, region_base + region_size, region_size / 1024);
-
-    uint32_t aligned_start = align_up(region_base, ALIGN_SIZE);
-    
-    // Check if the region is too small after alignment adjustment
-    if (region_size <= sizeof(free_list_block) + (aligned_start - region_base)) {
-        printf("Region too small to use for allocator\n");
-        return;
-    }
-    
-    // Adjust size for the alignment offset
+    uintptr_t aligned_start = (uintptr_t)align_up(region_base, ALIGN_SIZE);
+    if (region_size <= sizeof(free_list_block) + (aligned_start - region_base)) return;
     region_size -= (aligned_start - region_base);
-
+    allocator_start = aligned_start;
+    allocator_end = aligned_start + region_size;
     free_list_head = (free_list_block *)aligned_start;
+    free_list_head->magic = FREE_BLOCK_MAGIC;
     free_list_head->size = region_size - sizeof(free_list_block);
     free_list_head->next = NULL;
-
-    printf("Allocator ready: base=0x%x, size=%u bytes\n", aligned_start, free_list_head->size);
 }
 
 void *kmalloc(size_t size) {
     if (size == 0) return NULL;
-
     size = align_up(size, ALIGN_SIZE);
     if (size < MIN_ALLOC_SIZE) size = MIN_ALLOC_SIZE;
-
-    if (!free_list_head) {
-        printf("kmalloc: allocator not initialized!\n");
-        return NULL;
-    }
-
+    if (!free_list_head) return NULL;
     unsigned long flags = save_and_cli();
-    free_list_block **current = &free_list_head;
-
-    while (*current) {
-        printf("Current\n");
-        free_list_block *block = *current;
-        if (block->size >= size) {
-            // Split block if remaining space is large enough for another header + min block
-            if (block->size >= size + sizeof(free_list_block) + MIN_ALLOC_SIZE) {
-                free_list_block *new_block =
-                    (free_list_block *)((uint8_t *)block + sizeof(free_list_block) + size);
-                new_block->size = block->size - size - sizeof(free_list_block);
-                new_block->next = block->next;
-                *current = new_block; // The new (smaller) free block replaces the old one
-                block->size = size;    // Set the allocated block's size
+    free_list_block *prev = NULL;
+    free_list_block *cur = free_list_head;
+    while (cur) {
+        if (!valid_block_ptr(cur)) break;
+        if (cur->size >= size) {
+            if (cur->size >= size + sizeof(free_list_block) + MIN_ALLOC_SIZE) {
+                free_list_block *new_block = (free_list_block *)((uint8_t *)cur + sizeof(free_list_block) + size);
+                new_block->magic = FREE_BLOCK_MAGIC;
+                new_block->size = cur->size - size - sizeof(free_list_block);
+                new_block->next = cur->next;
+                cur->size = size;
+                if (prev) prev->next = new_block;
+                else free_list_head = new_block;
             } else {
-                // Not enough space to split, allocate the whole block
-                *current = block->next;
+                if (prev) prev->next = cur->next;
+                else free_list_head = cur->next;
             }
-
             restore_flags(flags);
-            void *result = (uint8_t *)block + sizeof(free_list_block);
-            memset_page(result, 0, size);
-            return result;
+            void *res = (uint8_t *)cur + sizeof(free_list_block);
+            for (size_t i = 0; i < size; i++) ((uint8_t *)res)[i] = 0;
+            return res;
         }
-        current = &((*current)->next);
+        prev = cur;
+        cur = cur->next;
     }
-
     restore_flags(flags);
-    printf("kmalloc: out of memory for %u bytes\n", size);
     return NULL;
 }
 
 void kfree(void *ptr) {
     if (!ptr) return;
     free_list_block *block = (free_list_block *)((uint8_t *)ptr - sizeof(free_list_block));
+    if ((uintptr_t)block < allocator_start || (uintptr_t)block + sizeof(free_list_block) > allocator_end) return;
     unsigned long flags = save_and_cli();
     insert_free_block_sorted(block);
     restore_flags(flags);
@@ -137,31 +141,23 @@ void kfree(void *ptr) {
 void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
     uint8_t *restrict pdest = (uint8_t *restrict)dest;
     const uint8_t *restrict psrc = (const uint8_t *restrict)src;
-    for (size_t i = 0; i < n; i++) {
-        pdest[i] = psrc[i];
-    }
+    for (size_t i = 0; i < n; i++) pdest[i] = psrc[i];
     return dest;
 }
 
 void *memset(void *s, int c, size_t n) {
     uint8_t *p = (uint8_t *)s;
-    for (size_t i = 0; i < n; i++) {
-        p[i] = (uint8_t)c;
-    }
+    for (size_t i = 0; i < n; i++) p[i] = (uint8_t)c;
     return s;
 }
 
 void *memmove(void *dest, const void *src, size_t n) {
     uint8_t *pdest = (uint8_t *)dest;
     const uint8_t *psrc = (const uint8_t *)src;
-    if (src > dest) {
-        for (size_t i = 0; i < n; i++) {
-            pdest[i] = psrc[i];
-        }
-    } else if (src < dest) {
-        for (size_t i = n; i > 0; i--) {
-            pdest[i-1] = psrc[i-1];
-        }
+    if (psrc < pdest) {
+        for (size_t i = n; i > 0; i--) pdest[i-1] = psrc[i-1];
+    } else {
+        for (size_t i = 0; i < n; i++) pdest[i] = psrc[i];
     }
     return dest;
 }
@@ -170,9 +166,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
     const uint8_t *p1 = (const uint8_t *)s1;
     const uint8_t *p2 = (const uint8_t *)s2;
     for (size_t i = 0; i < n; i++) {
-        if (p1[i] != p2[i]) {
-            return p1[i] < p2[i] ? -1 : 1;
-        }
+        if (p1[i] != p2[i]) return p1[i] < p2[i] ? -1 : 1;
     }
     return 0;
 }
